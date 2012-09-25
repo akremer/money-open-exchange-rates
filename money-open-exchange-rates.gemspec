@@ -14,6 +14,7 @@ Gem::Specification.new do |s|
   s.rubygems_version = %q{1.3.7}
   s.add_dependency "multi_json", "~> 1.0"
   s.add_dependency "money", ">=3.7.1"
+  s.add_dependency "redis", ">=3.0"
   s.add_development_dependency "minitest", ">=2.0"
   s.add_development_dependency "rr", ">=1.0.4"
 end

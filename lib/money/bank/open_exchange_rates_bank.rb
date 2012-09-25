@@ -2,6 +2,7 @@
 require 'open-uri'
 require 'multi_json'
 require 'money'
+require 'redis'
 
 class Money
   module Bank
@@ -13,7 +14,7 @@ class Money
 
       OER_URL = 'http://openexchangerates.org/latest.json'
 
-      attr_accessor :cache, :app_id
+      attr_accessor :cache, :cache_key, :app_id
       attr_reader :doc, :oer_rates
 
       def update_rates
@@ -31,8 +32,6 @@ class Money
         if has_valid_rates?(text)
           store_in_cache(text)
         end
-      rescue Errno::ENOENT
-        raise InvalidCache
       end
 
       def exchange(cents, from_currency, to_currency)
@@ -53,25 +52,17 @@ class Money
 
       protected
 
-      # Store the provided text data by calling the proc method provided
-      # for the cache, or write to the cache file.
       def store_in_cache(text)
-        if cache.is_a?(Proc)
-          cache.call(text)
-        elsif cache.is_a?(String)
-          open(cache, 'w') do |f|
-            f.write(text)
-          end
+        if cache.is_a?(Redis)
+          cache.set(cache_key, text)
         else
-          nil
+          raise InvalidCache
         end
       end
 
       def read_from_cache
-        if cache.is_a?(Proc)
-          cache.call(nil)
-        elsif cache.is_a?(String) && File.exist?(cache)
-          open(cache).read
+        if cache.is_a?(Redis)
+          cache.get(cache_key)
         else
           nil
         end

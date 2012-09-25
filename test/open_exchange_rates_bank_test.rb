@@ -7,19 +7,13 @@ require File.expand_path(File.join(File.dirname(__FILE__), 'test_helper'))
 
 describe Money::Bank::OpenExchangeRatesBank do
 
-  before do
-    @cache_path = File.expand_path(File.join(File.dirname(__FILE__), 'latest.json'))
-  end
-
   describe 'exchange' do
     include RR::Adapters::TestUnit
 
     before do
       @bank = Money::Bank::OpenExchangeRatesBank.new
       @bank.app_id = TEST_APP_ID
-      @temp_cache_path = File.expand_path(File.join(File.dirname(__FILE__), 'tmp.json'))
-      @bank.cache = @temp_cache_path
-      stub(OpenURI::OpenRead).open(Money::Bank::OpenExchangeRatesBank::OER_URL) { File.read @cache_path }
+      @bank.cache = Redis.new
       @bank.save_rates
     end
 
@@ -38,7 +32,7 @@ describe Money::Bank::OpenExchangeRatesBank do
     before do
       @bank = Money::Bank::OpenExchangeRatesBank.new
       @bank.app_id = TEST_APP_ID
-      @bank.cache = @cache_path
+      @bank.cache = Redis.new
       @bank.update_rates
     end
 
@@ -64,7 +58,7 @@ describe Money::Bank::OpenExchangeRatesBank do
         @bank.exchange_with(Money.new(100, "USD"), currency).cents.must_equal((@bank.oer_rates[currency].to_f * subunit).round)
         @bank.exchange_with(1.to_money("USD"), currency).cents.must_equal((@bank.oer_rates[currency].to_f * subunit).round)
       end
-      @bank.exchange_with(5000.to_money('JPY'), 'USD').cents.must_equal 6441
+      @bank.exchange_with(5000.to_money('JPY'), 'USD').cents.must_equal 6423
     end
 
     it "should not return 0 with integer rate" do
@@ -108,9 +102,7 @@ begin
     
     before do
       @bank = Money::Bank::OpenExchangeRatesBank.new
-      @temp_cache_path = File.expand_path(File.join(File.dirname(__FILE__), 'tmp.json'))
-      @bank.cache = @temp_cache_path
-      stub(OpenURI::OpenRead).open(Money::Bank::OpenExchangeRatesBank::OER_URL) { File.read @cache_path }
+      @bank.cache = Redis.new
     end
     
     it 'should raise an error if no App ID is set' do
@@ -131,7 +123,6 @@ end
     end
 
     it 'should get from url' do
-      stub(OpenURI::OpenRead).open(Money::Bank::OpenExchangeRatesBank::OER_URL) { File.read @cache_path }
       @bank.update_rates
       @bank.oer_rates.wont_be_empty
     end
@@ -139,58 +130,6 @@ end
     it 'should raise an error if invalid path is given to save_rates' do
       proc { @bank.save_rates }.must_raise Money::Bank::InvalidCache
     end
-  end
-
-  describe 'no valid file for cache' do
-    include RR::Adapters::TestUnit
-    before do
-      @bank = Money::Bank::OpenExchangeRatesBank.new
-      @bank.cache = "space_dir#{rand(999999999)}/out_space_file.json"
-      @bank.app_id = TEST_APP_ID
-    end
-
-    it 'should get from url' do
-      stub(OpenURI::OpenRead).open(Money::Bank::OpenExchangeRatesBank::OER_URL) { File.read @cache_path }
-      @bank.update_rates
-      @bank.oer_rates.wont_be_empty
-    end
-
-    it 'should raise an error if invalid path is given to save_rates' do
-      proc { @bank.save_rates }.must_raise Money::Bank::InvalidCache
-    end
-  end
-
-  describe 'using proc for cache' do
-    include RR::Adapters::TestUnit
-
-    before :each do
-      $global_rates = nil
-      @bank = Money::Bank::OpenExchangeRatesBank.new
-      @bank.cache = Proc.new {|v|
-        if v
-          $global_rates = v
-        else
-          $global_rates
-        end
-      }
-      @bank.app_id = TEST_APP_ID
-    end
-
-    it 'should get from url normally' do
-      stub(@bank).source_url() { @cache_path }
-      @bank.update_rates
-      @bank.oer_rates.wont_be_empty
-    end
-
-    it 'should save from url and get from cache' do
-      stub(@bank).source_url { @cache_path }
-      @bank.save_rates
-      $global_rates.wont_be_empty
-      dont_allow(@bank).source_url
-      @bank.update_rates
-      @bank.oer_rates.wont_be_empty
-    end
-
   end
 
   describe 'save rates' do
@@ -199,9 +138,7 @@ end
     before do
       @bank = Money::Bank::OpenExchangeRatesBank.new
       @bank.app_id = "temp-e091fc14b3884a516d6cc2c299a"
-      @temp_cache_path = File.expand_path(File.join(File.dirname(__FILE__), 'tmp.json'))
-      @bank.cache = @temp_cache_path
-      stub(OpenURI::OpenRead).open(Money::Bank::OpenExchangeRatesBank::OER_URL) { File.read @cache_path }
+      @bank.cache = Redis.new
       @bank.save_rates
     end
 
@@ -211,31 +148,6 @@ end
       rescue
         assert false, "Should allow updating after saving"
       end
-    end
-
-    it "should not break an existing file if save fails to read" do
-      initial_size = File.read(@temp_cache_path).size
-      stub(@bank).read_from_url {""}
-      @bank.save_rates
-      File.open(@temp_cache_path).read.size.must_equal initial_size
-    end
-
-    it "should not break an existing file if save returns json without rates" do
-      initial_size = File.read(@temp_cache_path).size
-      stub(@bank).read_from_url { %Q({"error": "An error"}) }
-      @bank.save_rates
-      File.open(@temp_cache_path).read.size.must_equal initial_size
-    end
-
-    it "should not break an existing file if save returns a invalid json" do
-      initial_size = File.read(@temp_cache_path).size
-      stub(@bank).read_from_url { %Q({invalid_json: "An error"}) }
-      @bank.save_rates
-      File.open(@temp_cache_path).read.size.must_equal initial_size
-    end
-
-    after do
-      File.delete @temp_cache_path
     end
   end
 end
