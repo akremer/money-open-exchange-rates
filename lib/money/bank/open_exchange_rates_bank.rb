@@ -54,7 +54,7 @@ class Money
 
       def store_in_cache(text)
         if cache.is_a?(Redis)
-          cache.set(cache_key, text)
+          cache.set(cache_key || "oer_cache", text)
         else
           raise InvalidCache
         end
