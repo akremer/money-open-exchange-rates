@@ -1,4 +1,4 @@
-# Money Open Exchange Rates
+# Money Open Exchange Rates with Redis Cache
 
 A gem that calculates the exchange rate using published rates from [open-exchange-rates](http://josscrowcroft.github.com/open-exchange-rates/)
 
@@ -7,25 +7,11 @@ A gem that calculates the exchange rate using published rates from [open-exchang
 ```ruby
 require 'money/bank/open_exchange_rates_bank'
 moe = Money::Bank::OpenExchangeRatesBank.new
-moe.cache = 'path/to/file/cache'
+moe.cache = Redis.new
 moe.app_id = 'your app id from https://openexchangerates.org/signup'
 moe.update_rates
 
 Money.default_bank = moe
-```
-
-You can also provide a Proc as a cache to provide your own caching mechanism
-perhaps with Redis or just a thread safe `Hash` (global). For example:
-
-```ruby
-moe.cache = Proc.new do |v|
-  key = 'money:exchange_rates']
-  if v
-    Thread.current[key] = v
-  else
-    Thread.current[key]
-  end
-end
 ```
 
 ## Tests
